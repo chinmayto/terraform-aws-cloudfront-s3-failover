@@ -9,6 +9,8 @@ CloudFront routes all incoming requests to the primary origin, even when a previ
 
 ![alt text](/images/diagram.png)
 
+![alt text](/images/diagram2.png)
+
 ### Step 1: Create a primary and failover S3 Buckets with unique name and host static website by uploading files
 
 ### Step 2: Create a cloudfront distribution with primary and failover origin
