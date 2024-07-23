@@ -10,10 +10,10 @@ variable "bucket_name_primary" {
   default     = "cf-s3-static-website-primary"
 }
 
-variable "bucket_name_failover" {
+variable "bucket_name_secondary" {
   type        = string
   description = "Name of the S3 Bucket"
-  default     = "cf-s3-static-website-failover"
+  default     = "cf-s3-static-website-secondary"
 }
 
 variable "company" {
