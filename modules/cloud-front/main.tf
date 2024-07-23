@@ -2,13 +2,13 @@ data "aws_s3_bucket" "s3_primary" {
   bucket = var.s3_primary_bucket_id
 }
 
-data "aws_s3_bucket" "s3_secondary" {
-  bucket = var.s3_secondary_bucket_id
+data "aws_s3_bucket" "s3_failover" {
+  bucket = var.s3_failover_bucket_id
 }
 
-################################################################################
+####################################################
 # Create AWS Cloudfront distribution
-################################################################################
+####################################################
 resource "aws_cloudfront_origin_access_control" "cf-s3-oac" {
   name                              = "CloudFront S3 OAC"
   description                       = "CloudFront S3 OAC"
@@ -21,54 +21,49 @@ resource "aws_cloudfront_distribution" "cf-dist" {
   enabled             = true
   default_root_object = "index.html"
 
-  # Primary origin with default cache behavior
+  origin_group {
+    origin_id = "origin_group_id"
+    failover_criteria {
+      status_codes = [403, 404, 500, 502, 503, 504]
+    }
+    member {
+      origin_id = "s3_primary"
+    }
+    member {
+      origin_id = "s3_failover"
+    }
+  }
+
   origin {
     domain_name              = data.aws_s3_bucket.s3_primary.bucket_regional_domain_name
     origin_id                = "s3_primary"
     origin_access_control_id = aws_cloudfront_origin_access_control.cf-s3-oac.id
   }
 
-  default_cache_behavior {
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "s3_primary"
-    viewer_protocol_policy = "allow-all"
+  origin {
+    domain_name              = data.aws_s3_bucket.s3_failover.bucket_regional_domain_name
+    origin_id                = "s3_failover"
+    origin_access_control_id = aws_cloudfront_origin_access_control.cf-s3-oac.id
+  }
 
+  default_cache_behavior {
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "origin_group_id"
     forwarded_values {
       query_string = false
+
       cookies {
         forward = "none"
       }
     }
-  }
-
-  # Secondary origin with path-pattern based cache behavior
-  origin {
-    domain_name              = data.aws_s3_bucket.s3_secondary.bucket_regional_domain_name
-    origin_id                = "s3_secondary"
-    origin_access_control_id = aws_cloudfront_origin_access_control.cf-s3-oac.id
-  }
-
-  ordered_cache_behavior {
-    path_pattern           = "/secondary/*"
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "s3_secondary"
     viewer_protocol_policy = "allow-all"
-
-    default_ttl = 0
-    min_ttl     = 0
-    max_ttl     = 0
-
-    forwarded_values {
-      query_string = true
-      cookies {
-        forward = "all"
-      }
-    }
+    min_ttl                = 0
+    default_ttl            = 360
+    max_ttl                = 86400
   }
 
-  price_class = "PriceClass_200"
+  price_class = "PriceClass_All"
 
   restrictions {
     geo_restriction {
